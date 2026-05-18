@@ -3,20 +3,26 @@ function download(blob, filename) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function shareOrExportJSON(data) {
   const date = new Date().toISOString().slice(0, 10);
   const filename = `kozyodx_${date}.json`;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const file = new File([blob], filename, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file], title: '設備点検データ' });
-  } else {
-    download(blob, filename);
+  if (navigator.share) {
+    try {
+      const file = new File([blob], filename, { type: 'application/json' });
+      await navigator.share({ files: [file], title: '設備点検データ' });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
   }
+  download(blob, filename);
 }
 
 export function exportJSON(data) {
