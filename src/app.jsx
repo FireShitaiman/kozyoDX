@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import CheckInput from './components/CheckInput'
-import { loadData, saveData } from './utils/storage'
+import { loadData, saveData, mergeDataList } from './utils/storage'
 import { shareOrExportJSON } from './utils/export'
 import './app.css'
 
@@ -47,9 +47,10 @@ function StatusBadge({ status, size }) {
 
 // --- Screens ---
 
-function HomeScreen({ data, onSelect, onExport }) {
+function HomeScreen({ data, onSelect, onExport, onImport }) {
   const [operator, setOperator] = useState(() => localStorage.getItem('kozyodx_op') || '')
   const [editing, setEditing] = useState(!localStorage.getItem('kozyodx_op'))
+  const importRef = useRef(null)
 
   const ORDER = { ng: 0, warn: 1, ok: 2, unknown: 3 }
   const list = Object.values(data.equipment).sort(
@@ -68,7 +69,11 @@ function HomeScreen({ data, onSelect, onExport }) {
           <h1 className="app-title">設備巡回点検</h1>
           <p className="app-site">{data.meta?.site}</p>
         </div>
-        <button className="btn-icon" onClick={onExport} title="送信・エクスポート">⬆</button>
+        <div className="header-btns">
+          <button className="btn-icon" onClick={() => importRef.current?.click()} title="JSONインポート">⬇</button>
+          <button className="btn-icon" onClick={onExport} title="送信・エクスポート">⬆</button>
+        </div>
+        <input ref={importRef} type="file" accept=".json" multiple hidden onChange={e => { onImport(e.target.files); e.target.value = '' }} />
       </header>
 
       <div className="operator-bar">
@@ -267,6 +272,18 @@ export default function App() {
     }
   }, [])
 
+  const handleImport = files => {
+    const arr = Array.from(files).filter(f => f.name.endsWith('.json'))
+    if (arr.length === 0) return
+    Promise.all(arr.map(f => f.text().then(t => JSON.parse(t))))
+      .then(list => {
+        const merged = data ? mergeDataList([data, ...list]) : mergeDataList(list)
+        setData(merged)
+        saveData(merged)
+      })
+      .catch(() => alert('JSONの読み込みに失敗しました'))
+  }
+
   const handleSelect = (eq, op) => { setSelEq(eq); setScreen('check') }
 
   const handleConfirm = ({ results, overall, operator }) => {
@@ -289,7 +306,7 @@ export default function App() {
   if (!data) return <div className="loading">読み込み中…</div>
 
   if (screen === 'home') {
-    return <HomeScreen data={data} onSelect={handleSelect} onExport={() => shareOrExportJSON(data)} />
+    return <HomeScreen data={data} onSelect={handleSelect} onExport={() => shareOrExportJSON(data)} onImport={handleImport} />
   }
   if (screen === 'check') {
     return (

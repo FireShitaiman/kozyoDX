@@ -69,6 +69,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .btn-icon:active { background: rgba(255,255,255,.35); }
+.header-btns { display: flex; gap: 8px; }
 
 /* Operator bar */
 .operator-bar {
