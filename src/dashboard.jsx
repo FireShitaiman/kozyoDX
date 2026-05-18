@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { loadData, saveData, mergeDataList } from './utils/storage'
-import { exportJSON, exportCSV } from './utils/export'
+import { exportMasterJSON, exportCSV } from './utils/export'
 import './dashboard.css'
 
 const STATUS_COLOR = { ok: '#22c55e', warn: '#f59e0b', ng: '#ef4444', unknown: '#94a3b8' }
@@ -165,7 +165,7 @@ export default function Dashboard() {
           <button className="btn-action" onClick={() => fileRef.current?.click()}>⬇ JSONインポート</button>
           <input ref={fileRef} type="file" accept=".json" multiple hidden onChange={onFileChange} />
           {data && <>
-            <button className="btn-action" onClick={() => exportJSON(data)}>⬆ JSONエクスポート</button>
+            <button className="btn-action" onClick={() => exportMasterJSON(data)}>⬆ masterエクスポート</button>
             <button className="btn-action" onClick={() => exportCSV(data)}>📊 CSV出力</button>
           </>}
         </div>

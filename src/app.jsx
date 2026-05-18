@@ -71,7 +71,7 @@ function HomeScreen({ data, onSelect, onExport, onImport }) {
         </div>
         <div className="header-btns">
           <button className="btn-icon" onClick={() => importRef.current?.click()} title="JSONインポート">⬇</button>
-          <button className="btn-icon" onClick={onExport} title="送信・エクスポート">⬆</button>
+          <button className="btn-icon" onClick={() => onExport(operator)} title="送信・エクスポート">⬆</button>
         </div>
         <input ref={importRef} type="file" accept=".json" multiple hidden onChange={e => { onImport(e.target.files); e.target.value = '' }} />
       </header>
@@ -306,7 +306,7 @@ export default function App() {
   if (!data) return <div className="loading">読み込み中…</div>
 
   if (screen === 'home') {
-    return <HomeScreen data={data} onSelect={handleSelect} onExport={() => shareOrExportJSON(data)} onImport={handleImport} />
+    return <HomeScreen data={data} onSelect={handleSelect} onExport={op => shareOrExportJSON(data, op)} onImport={handleImport} />
   }
   if (screen === 'check') {
     return (

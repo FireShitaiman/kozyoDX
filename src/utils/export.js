@@ -9,9 +9,10 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export async function shareOrExportJSON(data) {
+export async function shareOrExportJSON(data, operator) {
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `kozyodx_${date}.json`;
+  const suffix = operator ? `_${operator.replace(/[\\/:*?"<>|]/g, '')}` : '';
+  const filename = `kozyodx_${date}${suffix}.json`;
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
 
@@ -32,10 +33,9 @@ export async function shareOrExportJSON(data) {
   download(blob, filename);
 }
 
-export function exportJSON(data) {
-  const date = new Date().toISOString().slice(0, 10);
+export function exportMasterJSON(data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  download(blob, `kozyodx_${date}.json`);
+  download(blob, 'kozyodx_master.json');
 }
 
 export function exportCSV(data) {
