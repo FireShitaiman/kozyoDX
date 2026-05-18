@@ -6,6 +6,12 @@ import './dashboard.css'
 const STATUS_COLOR = { ok: '#22c55e', warn: '#f59e0b', ng: '#ef4444', unknown: '#94a3b8' }
 const STATUS_LABEL = { ok: '正常', warn: '要注意', ng: '異常', unknown: '未点検' }
 const STALE_DAYS = 7
+const CHECK_TYPES = [
+  { value: '3step',  label: '3択（正常/要注意/異常）' },
+  { value: 'bool',   label: 'あり/なし' },
+  { value: 'number', label: '数値' },
+  { value: 'text',   label: 'テキスト' },
+]
 
 function getStatus(eq) {
   const records = eq.records || []
@@ -134,6 +140,241 @@ function DetailModal({ eq, onClose }) {
   )
 }
 
+function EquipmentForm({ data, eq, onSave, onCancel }) {
+  const isNew = !eq
+  const [id, setId] = useState(eq?.id || '')
+  const [name, setName] = useState(eq?.name || '')
+  const [location, setLocation] = useState(eq?.location || '')
+  const [checks, setChecks] = useState(() => eq?.checks?.map(c => ({ ...c })) || [])
+  const [errors, setErrors] = useState({})
+
+  const addCheck = () =>
+    setChecks(c => [...c, { id: `c${Date.now()}`, label: '', type: '3step' }])
+  const removeCheck = i => setChecks(c => c.filter((_, j) => j !== i))
+  const moveCheck = (i, dir) => setChecks(c => {
+    const arr = [...c]
+    const j = i + dir
+    if (j < 0 || j >= arr.length) return arr
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    return arr
+  })
+  const updateCheck = (i, field, val) =>
+    setChecks(c => c.map((item, j) => j === i ? { ...item, [field]: val } : item))
+
+  const handleSave = () => {
+    const e = {}
+    const trimId = id.trim()
+    if (!trimId) e.id = '設備IDは必須です'
+    else if (isNew && data?.equipment?.[trimId]) e.id = 'このIDは既に使用されています'
+    if (!name.trim()) e.name = '設備名は必須です'
+    if (Object.keys(e).length) { setErrors(e); return }
+    onSave({
+      ...(eq || {}),
+      id: trimId,
+      name: name.trim(),
+      location: location.trim(),
+      checks: checks.filter(c => c.label.trim()),
+      records: eq?.records || [],
+    })
+  }
+
+  return (
+    <div className="eq-form">
+      <div className="form-row">
+        <label className="form-label">設備ID <span className="required">*</span></label>
+        <input
+          className={`form-input${errors.id ? ' input-error' : ''}`}
+          value={id}
+          onChange={e => { setId(e.target.value); setErrors(v => ({ ...v, id: '' })) }}
+          disabled={!isNew}
+          placeholder="例: M-001"
+        />
+        {errors.id && <p className="err-msg">{errors.id}</p>}
+        {!isNew && <p className="form-hint">IDは変更不可（記録データと紐付いています）</p>}
+      </div>
+
+      <div className="form-row">
+        <label className="form-label">設備名 <span className="required">*</span></label>
+        <input
+          className={`form-input${errors.name ? ' input-error' : ''}`}
+          value={name}
+          onChange={e => { setName(e.target.value); setErrors(v => ({ ...v, name: '' })) }}
+          placeholder="例: 送風機#1 モーター"
+        />
+        {errors.name && <p className="err-msg">{errors.name}</p>}
+      </div>
+
+      <div className="form-row">
+        <label className="form-label">場所</label>
+        <input
+          className="form-input"
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+          placeholder="例: 1F 北側"
+        />
+      </div>
+
+      <div className="form-row">
+        <div className="checks-hd">
+          <label className="form-label">点検項目</label>
+          <button className="btn-add-check" type="button" onClick={addCheck}>+ 追加</button>
+        </div>
+        {checks.length === 0 && (
+          <p className="form-hint" style={{ marginTop: 8 }}>「+ 追加」ボタンで項目を追加できます。</p>
+        )}
+        <div className="checks-list">
+          {checks.map((c, i) => (
+            <div key={c.id} className="check-row">
+              <div className="check-order-btns">
+                <button className="btn-order" type="button" onClick={() => moveCheck(i, -1)} disabled={i === 0}>↑</button>
+                <button className="btn-order" type="button" onClick={() => moveCheck(i, 1)} disabled={i === checks.length - 1}>↓</button>
+              </div>
+              <input
+                className="form-input check-label"
+                value={c.label}
+                onChange={e => updateCheck(i, 'label', e.target.value)}
+                placeholder="項目名（例: 振動）"
+              />
+              <select
+                className="check-type-sel"
+                value={c.type}
+                onChange={e => updateCheck(i, 'type', e.target.value)}
+              >
+                {CHECK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <button className="btn-remove-check" type="button" onClick={() => removeCheck(i)}>×</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-actions">
+        <button className="btn-action" type="button" onClick={onCancel}>キャンセル</button>
+        <button className="btn-primary" type="button" onClick={handleSave}>保存</button>
+      </div>
+    </div>
+  )
+}
+
+function ManageModal({ data, onDataChange, onClose }) {
+  const [view, setView] = useState('list')
+  const [editTarget, setEditTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [siteName, setSiteName] = useState(data?.meta?.site || '')
+
+  const eqList = Object.values(data?.equipment || {})
+
+  const saveSiteName = () => {
+    if (siteName.trim() !== (data?.meta?.site || '')) {
+      onDataChange({ ...data, meta: { ...data.meta, site: siteName.trim() } })
+    }
+  }
+
+  const handleSaveEq = newEq => {
+    onDataChange({
+      ...data,
+      meta: { ...data.meta, site: siteName.trim() || data.meta?.site || '' },
+      equipment: { ...data.equipment, [newEq.id]: newEq },
+    })
+    setView('list')
+    setEditTarget(null)
+  }
+
+  const handleDelete = id => {
+    const equipment = { ...data.equipment }
+    delete equipment[id]
+    onDataChange({ ...data, equipment })
+    setDeleteTarget(null)
+  }
+
+  const openEdit = eq => { setEditTarget(eq); setView('form') }
+  const openNew  = ()  => { setEditTarget(null); setView('form') }
+  const backToList = () => { setView('list'); setEditTarget(null) }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal manage-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {view === 'form' && (
+              <button className="btn-back" onClick={backToList}>← 一覧</button>
+            )}
+            <h3 className="modal-title">
+              {view === 'form' ? (editTarget ? '設備を編集' : '設備を追加') : '設備管理'}
+            </h3>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body manage-body">
+          {view === 'list' ? (
+            <>
+              <div className="form-row">
+                <label className="form-label">サイト名</label>
+                <input
+                  className="form-input"
+                  value={siteName}
+                  onChange={e => setSiteName(e.target.value)}
+                  onBlur={saveSiteName}
+                  placeholder="例: 第一工場"
+                />
+              </div>
+
+              <div className="manage-list-hd">
+                <span className="manage-count">設備 {eqList.length}台</span>
+                <button className="btn-primary-sm" onClick={openNew}>+ 設備を追加</button>
+              </div>
+
+              {eqList.length === 0 ? (
+                <p className="no-records">設備が登録されていません</p>
+              ) : (
+                <div className="manage-eq-list">
+                  {eqList.map(eq => (
+                    <div key={eq.id} className="manage-eq-row">
+                      <div className="manage-eq-info">
+                        <span className="manage-eq-id">{eq.id}</span>
+                        <span className="manage-eq-name">{eq.name}</span>
+                        {eq.location && <span className="manage-eq-loc">{eq.location}</span>}
+                        <span className="manage-eq-cnt">{eq.checks?.length || 0}項目</span>
+                      </div>
+                      <div className="manage-eq-acts">
+                        <button className="btn-sm-edit" onClick={() => openEdit(eq)}>編集</button>
+                        <button className="btn-sm-del" onClick={() => setDeleteTarget(eq)}>削除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <EquipmentForm
+              data={data}
+              eq={editTarget}
+              onSave={handleSaveEq}
+              onCancel={backToList}
+            />
+          )}
+        </div>
+      </div>
+
+      {deleteTarget && (
+        <div className="confirm-backdrop" onClick={() => setDeleteTarget(null)}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
+            <p className="confirm-msg"><strong>{deleteTarget.name}</strong> を削除しますか？</p>
+            {(deleteTarget.records?.length || 0) > 0 && (
+              <p className="confirm-sub">点検記録 {deleteTarget.records.length}件も全て削除されます。</p>
+            )}
+            <div className="confirm-acts">
+              <button className="btn-action" onClick={() => setDeleteTarget(null)}>キャンセル</button>
+              <button className="btn-danger" onClick={() => handleDelete(deleteTarget.id)}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MonthlyReport({ data, onClose }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
@@ -231,6 +472,7 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all')
   const [detail, setDetail] = useState(null)
   const [report, setReport] = useState(false)
+  const [manage, setManage] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef(null)
@@ -239,6 +481,11 @@ export default function Dashboard() {
     const saved = loadData()
     if (saved) setData(saved)
   }, [])
+
+  const handleDataChange = newData => {
+    setData(newData)
+    saveData(newData)
+  }
 
   const handleImport = files => {
     const arr = Array.from(files).filter(f => f.name.endsWith('.json'))
@@ -277,6 +524,8 @@ export default function Dashboard() {
 
   const toggleFilter = st => setFilter(f => f === st ? 'all' : st)
 
+  const manageData = data || { meta: { site: '', exported: new Date().toISOString() }, equipment: {} }
+
   return (
     <div
       className="dash"
@@ -299,6 +548,7 @@ export default function Dashboard() {
         <div className="dash-actions">
           <button className="btn-action" onClick={() => fileRef.current?.click()}>⬇ JSONインポート</button>
           <input ref={fileRef} type="file" accept=".json" multiple hidden onChange={onFileChange} />
+          <button className="btn-action" onClick={() => setManage(true)}>⚙ 設備管理</button>
           {data && <>
             <button className="btn-action" onClick={() => exportMasterJSON(data)}>⬆ masterエクスポート</button>
             <button className="btn-action" onClick={() => exportCSV(data)}>📊 CSV出力</button>
@@ -310,10 +560,15 @@ export default function Dashboard() {
       {!data ? (
         <div className="no-data">
           <p className="no-data-main">データがありません</p>
-          <p className="no-data-sub">JSONファイルをインポートするか、スマホアプリで点検を開始してください</p>
-          <button className="btn-primary" onClick={() => fileRef.current?.click()}>
-            JSONファイルを選択
-          </button>
+          <p className="no-data-sub">JSONファイルをインポートするか、「⚙ 設備管理」から設備を登録してください</p>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="btn-primary" onClick={() => fileRef.current?.click()}>
+              JSONファイルを選択
+            </button>
+            <button className="btn-primary" style={{ background: '#475569' }} onClick={() => setManage(true)}>
+              ⚙ 設備を登録する
+            </button>
+          </div>
         </div>
       ) : (
         <div className="dash-body">
@@ -387,6 +642,13 @@ export default function Dashboard() {
 
       {detail && <DetailModal eq={detail} onClose={() => setDetail(null)} />}
       {report && <MonthlyReport data={data} onClose={() => setReport(false)} />}
+      {manage && (
+        <ManageModal
+          data={manageData}
+          onDataChange={handleDataChange}
+          onClose={() => setManage(false)}
+        />
+      )}
     </div>
   )
 }
