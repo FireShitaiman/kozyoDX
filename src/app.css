@@ -320,3 +320,5 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .done-msg { font-size: 22px; font-weight: 700; }
+
+.app-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 999; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.3); }

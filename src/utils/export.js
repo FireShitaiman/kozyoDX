@@ -20,12 +20,13 @@ export async function shareOrExportJSON(data, operator) {
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: '設備点検データ' });
-      return;
+      return 'shared';
     } catch (e) {
-      if (e.name === 'AbortError') return;
+      if (e.name === 'AbortError') return 'aborted';
     }
   }
   download(blob, filename);
+  return 'downloaded';
 }
 
 export function exportMasterJSON(data) {

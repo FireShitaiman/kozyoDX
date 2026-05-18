@@ -256,6 +256,7 @@ export default function App() {
   const [screen, setScreen] = useState('home')
   const [selEq, setSelEq] = useState(null)
   const [pending, setPending] = useState(null)
+  const [toast, setToast] = useState('')
 
   useEffect(() => {
     const saved = loadData()
@@ -305,8 +306,21 @@ export default function App() {
 
   if (!data) return <div className="loading">読み込み中…</div>
 
+  const handleExport = async op => {
+    const result = await shareOrExportJSON(data, op)
+    if (result === 'downloaded') {
+      setToast('ダウンロードしました（Downloadsフォルダを確認）')
+      setTimeout(() => setToast(''), 4000)
+    }
+  }
+
   if (screen === 'home') {
-    return <HomeScreen data={data} onSelect={handleSelect} onExport={op => shareOrExportJSON(data, op)} onImport={handleImport} />
+    return (
+      <>
+        <HomeScreen data={data} onSelect={handleSelect} onExport={handleExport} onImport={handleImport} />
+        {toast && <div className="app-toast">{toast}</div>}
+      </>
+    )
   }
   if (screen === 'check') {
     return (
