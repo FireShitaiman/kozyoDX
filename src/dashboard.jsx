@@ -5,6 +5,7 @@ import './dashboard.css'
 
 const STATUS_COLOR = { ok: '#22c55e', warn: '#f59e0b', ng: '#ef4444', unknown: '#94a3b8' }
 const STATUS_LABEL = { ok: '正常', warn: '要注意', ng: '異常', unknown: '未点検' }
+const STALE_DAYS = 7
 
 function getStatus(eq) {
   const records = eq.records || []
@@ -17,12 +18,95 @@ function getLatest(eq) {
   return records.length > 0 ? records[records.length - 1] : null
 }
 
+function getConsecutiveAlertCount(eq) {
+  const records = eq.records || []
+  let count = 0
+  for (let i = records.length - 1; i >= 0; i--) {
+    const o = records[i].overall
+    if (o === 'warn' || o === 'ng') count++
+    else break
+  }
+  return count
+}
+
+function getDaysSince(dateStr) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.floor((today - new Date(dateStr)) / 86400000)
+}
+
+function getStaleDays(eq) {
+  const rec = getLatest(eq)
+  return rec ? getDaysSince(rec.date) : null
+}
+
 function SummaryCard({ label, count, color, active, onClick }) {
   return (
     <button className={`summary-card ${active ? 'active' : ''}`} style={{ borderTopColor: color }} onClick={onClick}>
       <div className="summary-count" style={{ color }}>{count}</div>
       <div className="summary-label">{label}</div>
     </button>
+  )
+}
+
+function AlertBar({ eqList }) {
+  const staleCount = eqList.filter(eq => {
+    const d = getStaleDays(eq)
+    return d !== null && d >= STALE_DAYS
+  }).length
+  const consecCount = eqList.filter(eq => getConsecutiveAlertCount(eq) >= 2).length
+  if (staleCount === 0 && consecCount === 0) return null
+  return (
+    <div className="alert-bar">
+      {staleCount > 0 && (
+        <span className="alert-chip alert-stale">⏱ {staleCount}台が{STALE_DAYS}日以上未点検</span>
+      )}
+      {consecCount > 0 && (
+        <span className="alert-chip alert-consec">🔴 {consecCount}台で連続異常を検出</span>
+      )}
+    </div>
+  )
+}
+
+function RecordTable({ eq, records }) {
+  return (
+    <div className="table-scroll">
+      <table className="rec-table">
+        <thead>
+          <tr>
+            <th>日付</th><th>時刻</th><th>作業者</th><th>総合</th>
+            {eq.checks?.map(c => <th key={c.id}>{c.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((rec, i) => (
+            <tr key={i}>
+              <td>{rec.date}</td>
+              <td>{rec.time}</td>
+              <td>{rec.operator}</td>
+              <td>
+                <span className="badge" style={{ background: STATUS_COLOR[rec.overall] }}>
+                  {STATUS_LABEL[rec.overall]}
+                </span>
+              </td>
+              {eq.checks?.map(c => {
+                const val = rec.results?.[c.id]
+                let text = '—'
+                if (c.type === '3step' && val) text = STATUS_LABEL[val] || val
+                else if (c.type === 'bool') text = val === true ? 'あり' : val === false ? 'なし' : '—'
+                else if (val !== null && val !== undefined && val !== '') text = String(val)
+                return (
+                  <td key={c.id} style={{
+                    color: c.type === '3step' && val ? STATUS_COLOR[val] : 'inherit',
+                    fontWeight: c.type === '3step' && val ? 700 : 400,
+                  }}>{text}</td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -42,50 +126,100 @@ function DetailModal({ eq, onClose }) {
           {records.length === 0 ? (
             <p className="no-records">点検記録がありません</p>
           ) : (
-            <div className="table-scroll">
-              <table className="rec-table">
-                <thead>
-                  <tr>
-                    <th>日付</th>
-                    <th>時刻</th>
-                    <th>作業者</th>
-                    <th>総合</th>
-                    {eq.checks?.map(c => <th key={c.id}>{c.label}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((rec, i) => (
-                    <tr key={i}>
-                      <td>{rec.date}</td>
-                      <td>{rec.time}</td>
-                      <td>{rec.operator}</td>
-                      <td>
-                        <span className="badge" style={{ background: STATUS_COLOR[rec.overall] }}>
-                          {STATUS_LABEL[rec.overall]}
-                        </span>
-                      </td>
-                      {eq.checks?.map(c => {
-                        const val = rec.results?.[c.id]
-                        let text = '—'
-                        if (c.type === '3step' && val) text = STATUS_LABEL[val] || val
-                        else if (c.type === 'bool') text = val === true ? 'あり' : val === false ? 'なし' : '—'
-                        else if (val !== null && val !== undefined && val !== '') text = String(val)
-                        return (
-                          <td key={c.id}
-                            style={{
-                              color: c.type === '3step' && val ? STATUS_COLOR[val] : 'inherit',
-                              fontWeight: c.type === '3step' && val ? 700 : 400,
-                            }}>
-                            {text}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <RecordTable eq={eq} records={records} />
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MonthlyReport({ data, onClose }) {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+
+  const allYears = new Set([now.getFullYear()])
+  for (const eq of Object.values(data.equipment)) {
+    for (const rec of (eq.records || [])) {
+      allYears.add(parseInt(rec.date.slice(0, 4)))
+    }
+  }
+  const years = [...allYears].sort()
+
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`
+  const eqList = Object.values(data.equipment)
+
+  const reportRows = eqList.map(eq => ({
+    ...eq,
+    monthRecords: (eq.records || []).filter(r => r.date.startsWith(monthStr)),
+  }))
+
+  const counts = reportRows.reduce(
+    (a, eq) => {
+      if (eq.monthRecords.length === 0) { a.no_record++; return a }
+      const last = eq.monthRecords[eq.monthRecords.length - 1].overall
+      a[last] = (a[last] || 0) + 1
+      return a
+    },
+    { ok: 0, warn: 0, ng: 0, no_record: 0 }
+  )
+
+  const totalChecks = reportRows.reduce((n, eq) => n + eq.monthRecords.length, 0)
+
+  return (
+    <div className="overlay printable" onClick={onClose}>
+      <div className="modal report-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head no-print">
+          <h3 className="modal-title">月次点検レポート</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select className="month-sel" value={year} onChange={e => setYear(+e.target.value)}>
+              {years.map(y => <option key={y} value={y}>{y}年</option>)}
+            </select>
+            <select className="month-sel" value={month} onChange={e => setMonth(+e.target.value)}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m =>
+                <option key={m} value={m}>{m}月</option>
+              )}
+            </select>
+            <button className="btn-action" onClick={() => window.print()}>🖨 印刷/PDF保存</button>
+            <button className="btn-close" onClick={onClose}>✕</button>
+          </div>
+        </div>
+        <div className="modal-body report-body">
+          <div className="report-hd">
+            <h2>{data.meta?.site} 月次点検レポート</h2>
+            <p className="report-period">{year}年{month}月</p>
+            <p className="report-meta">対象設備: {eqList.length}台 / 点検実施回数: {totalChecks}回</p>
+          </div>
+
+          <div className="report-summary">
+            {[
+              { key: 'ng',      label: '異常',    count: counts.ng },
+              { key: 'warn',    label: '要注意',  count: counts.warn },
+              { key: 'ok',      label: '正常',    count: counts.ok },
+              { key: 'unknown', label: '記録なし', count: counts.no_record },
+            ].map(({ key, label, count }) => (
+              <div key={key} className="rep-chip" style={{ borderColor: STATUS_COLOR[key], color: STATUS_COLOR[key] }}>
+                <span className="rep-chip-num">{count}</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {reportRows.map(eq => (
+            <div key={eq.id} className="report-eq-section">
+              <div className="report-eq-head">
+                <strong>{eq.name}</strong>
+                <span className="report-eq-meta">{eq.id} / {eq.location}</span>
+                {eq.monthRecords.length === 0 && (
+                  <span className="badge" style={{ background: STATUS_COLOR.unknown }}>記録なし</span>
+                )}
+              </div>
+              {eq.monthRecords.length > 0 && (
+                <RecordTable eq={eq} records={eq.monthRecords} />
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -96,6 +230,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [filter, setFilter] = useState('all')
   const [detail, setDetail] = useState(null)
+  const [report, setReport] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef(null)
@@ -167,6 +302,7 @@ export default function Dashboard() {
           {data && <>
             <button className="btn-action" onClick={() => exportMasterJSON(data)}>⬆ masterエクスポート</button>
             <button className="btn-action" onClick={() => exportCSV(data)}>📊 CSV出力</button>
+            <button className="btn-action" onClick={() => setReport(true)}>📋 月次レポート</button>
           </>}
         </div>
       </header>
@@ -182,28 +318,28 @@ export default function Dashboard() {
       ) : (
         <div className="dash-body">
           <div className="summary-grid">
-            <SummaryCard label="異常"  count={counts.ng}      color={STATUS_COLOR.ng}      active={filter === 'ng'}      onClick={() => toggleFilter('ng')} />
-            <SummaryCard label="要注意" count={counts.warn}    color={STATUS_COLOR.warn}    active={filter === 'warn'}    onClick={() => toggleFilter('warn')} />
-            <SummaryCard label="正常"  count={counts.ok}      color={STATUS_COLOR.ok}      active={filter === 'ok'}      onClick={() => toggleFilter('ok')} />
-            <SummaryCard label="未点検" count={counts.unknown} color={STATUS_COLOR.unknown} active={filter === 'unknown'} onClick={() => toggleFilter('unknown')} />
+            <SummaryCard label="異常"   count={counts.ng}      color={STATUS_COLOR.ng}      active={filter === 'ng'}      onClick={() => toggleFilter('ng')} />
+            <SummaryCard label="要注意"  count={counts.warn}    color={STATUS_COLOR.warn}    active={filter === 'warn'}    onClick={() => toggleFilter('warn')} />
+            <SummaryCard label="正常"   count={counts.ok}      color={STATUS_COLOR.ok}      active={filter === 'ok'}      onClick={() => toggleFilter('ok')} />
+            <SummaryCard label="未点検"  count={counts.unknown} color={STATUS_COLOR.unknown} active={filter === 'unknown'} onClick={() => toggleFilter('unknown')} />
           </div>
+
+          <AlertBar eqList={eqList} />
 
           <div className="table-wrap">
             <table className="eq-table">
               <thead>
                 <tr>
-                  <th>設備ID</th>
-                  <th>設備名</th>
-                  <th>場所</th>
-                  <th>状態</th>
-                  <th>最終点検</th>
-                  <th>作業者</th>
+                  <th>設備ID</th><th>設備名</th><th>場所</th><th>状態</th><th>最終点検</th><th>作業者</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map(eq => {
                   const st = getStatus(eq)
                   const rec = getLatest(eq)
+                  const consec = getConsecutiveAlertCount(eq)
+                  const staleDays = getStaleDays(eq)
+                  const isStale = staleDays !== null && staleDays >= STALE_DAYS
                   return (
                     <tr key={eq.id} className="eq-row" onClick={() => setDetail(eq)}>
                       <td className="eq-id">{eq.id}</td>
@@ -213,8 +349,18 @@ export default function Dashboard() {
                         <span className="badge" style={{ background: STATUS_COLOR[st] }}>
                           {STATUS_LABEL[st]}
                         </span>
+                        {consec >= 2 && (
+                          <span className="badge-consec" style={{
+                            background: st === 'ng' ? '#fee2e2' : '#fef3c7',
+                            borderColor: st === 'ng' ? '#fca5a5' : '#fbbf24',
+                            color: st === 'ng' ? '#991b1b' : '#92400e',
+                          }}>{consec}連続</span>
+                        )}
                       </td>
-                      <td>{rec ? `${rec.date} ${rec.time}` : '—'}</td>
+                      <td className={isStale ? 'stale-cell' : ''}>
+                        {rec ? `${rec.date} ${rec.time}` : '—'}
+                        {isStale && <span className="stale-days"> ({staleDays}日経過)</span>}
+                      </td>
                       <td>{rec?.operator || '—'}</td>
                     </tr>
                   )
@@ -229,6 +375,7 @@ export default function Dashboard() {
       )}
 
       {detail && <DetailModal eq={detail} onClose={() => setDetail(null)} />}
+      {report && <MonthlyReport data={data} onClose={() => setReport(false)} />}
     </div>
   )
 }
