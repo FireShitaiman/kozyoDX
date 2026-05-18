@@ -15,19 +15,14 @@ export async function shareOrExportJSON(data, operator) {
   const filename = `kozyodx_${date}${suffix}.json`;
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
+  const file = new File([blob], filename, { type: 'application/json' });
 
-  if (navigator.share) {
+  if (navigator.canShare?.({ files: [file] })) {
     try {
-      const file = new File([blob], filename, { type: 'application/json' });
       await navigator.share({ files: [file], title: '設備点検データ' });
       return;
     } catch (e) {
       if (e.name === 'AbortError') return;
-      // share失敗 → ブラウザでファイルを開く（そこから共有・保存できる）
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      return;
     }
   }
   download(blob, filename);
