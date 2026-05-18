@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "site": "第一工場",
+    "exported": "2026-05-18T09:30:00",
+    "version": "1.0"
+  },
+  "equipment": {
+    "M-001": {
+      "id": "M-001",
+      "name": "送風機#1 モーター",
+      "location": "1F 北側",
+      "nfc_url": "https://example.com/check/M-001",
+      "checks": [
+        {"id": "vibration", "label": "振動（聴診）", "type": "3step"},
+        {"id": "heat",      "label": "熱（触診）",   "type": "3step"},
+        {"id": "current",   "label": "電流",          "type": "3step"},
+        {"id": "brush",     "label": "ブラシ火花",    "type": "bool"},
+        {"id": "memo",      "label": "備考",          "type": "text"}
+      ],
+      "records": [
+        {
+          "date": "2026-05-17",
+          "time": "08:15",
+          "operator": "田中",
+          "results": {
+            "vibration": "ok",
+            "heat": "ok",
+            "current": "warn",
+            "brush": false,
+            "memo": "電流が少し高め"
+          },
+          "overall": "warn"
+        }
+      ]
+    },
+    "M-002": {
+      "id": "M-002",
+      "name": "冷却ポンプ#2",
+      "location": "1F 南側",
+      "nfc_url": "https://example.com/check/M-002",
+      "checks": [
+        {"id": "vibration", "label": "振動（聴診）", "type": "3step"},
+        {"id": "heat",      "label": "熱（触診）",   "type": "3step"},
+        {"id": "leak",      "label": "液漏れ",        "type": "bool"},
+        {"id": "memo",      "label": "備考",          "type": "text"}
+      ],
+      "records": [
+        {
+          "date": "2026-05-18",
+          "time": "09:05",
+          "operator": "佐藤",
+          "results": {
+            "vibration": "ng",
+            "heat": "warn",
+            "leak": false,
+            "memo": "異音あり、要確認"
+          },
+          "overall": "ng"
+        }
+      ]
+    },
+    "C-001": {
+      "id": "C-001",
+      "name": "コンプレッサー#1",
+      "location": "2F 機械室",
+      "nfc_url": "https://example.com/check/C-001",
+      "checks": [
+        {"id": "vibration", "label": "振動（聴診）", "type": "3step"},
+        {"id": "pressure",  "label": "吐出圧力",     "type": "number"},
+        {"id": "heat",      "label": "熱（触診）",   "type": "3step"},
+        {"id": "oil",       "label": "オイルレベル", "type": "3step"},
+        {"id": "memo",      "label": "備考",          "type": "text"}
+      ],
+      "records": [
+        {
+          "date": "2026-05-18",
+          "time": "08:50",
+          "operator": "田中",
+          "results": {
+            "vibration": "ok",
+            "pressure": 0.75,
+            "heat": "ok",
+            "oil": "ok",
+            "memo": ""
+          },
+          "overall": "ok"
+        }
+      ]
+    },
+    "P-001": {
+      "id": "P-001",
+      "name": "給水ポンプ#1",
+      "location": "地下1F",
+      "nfc_url": "https://example.com/check/P-001",
+      "checks": [
+        {"id": "vibration", "label": "振動（聴診）", "type": "3step"},
+        {"id": "heat",      "label": "熱（触診）",   "type": "3step"},
+        {"id": "leak",      "label": "液漏れ",        "type": "bool"},
+        {"id": "memo",      "label": "備考",          "type": "text"}
+      ],
+      "records": []
+    }
+  }
+}

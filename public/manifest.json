@@ -1,0 +1,12 @@
+{
+  "name": "設備巡回点検",
+  "short_name": "巡回点検",
+  "description": "NFCで設備点検記録をデジタル化するPWA",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "lang": "ja",
+  "icons": []
+}
