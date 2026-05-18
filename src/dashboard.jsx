@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadData, saveData } from './utils/storage'
+import { loadData, saveData, mergeDataList } from './utils/storage'
 import { exportJSON, exportCSV } from './utils/export'
 import './dashboard.css'
 
@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all')
   const [detail, setDetail] = useState(null)
   const [dragging, setDragging] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -104,29 +105,29 @@ export default function Dashboard() {
     if (saved) setData(saved)
   }, [])
 
-  const handleImport = file => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      try {
-        const json = JSON.parse(e.target.result)
-        setData(json)
-        saveData(json)
-      } catch {
-        alert('JSONの読み込みに失敗しました。ファイルを確認してください。')
-      }
-    }
-    reader.readAsText(file)
+  const handleImport = files => {
+    const arr = Array.from(files).filter(f => f.name.endsWith('.json'))
+    if (arr.length === 0) return
+    Promise.all(arr.map(f => f.text().then(t => JSON.parse(t))))
+      .then(list => {
+        const merged = mergeDataList(list)
+        setData(merged)
+        saveData(merged)
+        const total = Object.values(merged.equipment).reduce((n, eq) => n + (eq.records?.length || 0), 0)
+        setImportMsg(`${arr.length}ファイルをマージしました（記録: ${total}件）`)
+        setTimeout(() => setImportMsg(''), 4000)
+      })
+      .catch(() => alert('JSONの読み込みに失敗しました。ファイルを確認してください。'))
   }
 
   const onDrop = e => {
     e.preventDefault()
     setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleImport(file)
+    if (e.dataTransfer.files.length > 0) handleImport(e.dataTransfer.files)
   }
 
   const onFileChange = e => {
-    if (e.target.files[0]) handleImport(e.target.files[0])
+    if (e.target.files.length > 0) handleImport(e.target.files)
     e.target.value = ''
   }
 
@@ -150,9 +151,10 @@ export default function Dashboard() {
     >
       {dragging && (
         <div className="drop-mask">
-          <div className="drop-label">JSONファイルをドロップ</div>
+          <div className="drop-label">JSONファイルをドロップ（複数可）</div>
         </div>
       )}
+      {importMsg && <div className="import-toast">{importMsg}</div>}
 
       <header className="dash-head">
         <div>
@@ -161,7 +163,7 @@ export default function Dashboard() {
         </div>
         <div className="dash-actions">
           <button className="btn-action" onClick={() => fileRef.current?.click()}>⬇ JSONインポート</button>
-          <input ref={fileRef} type="file" accept=".json" hidden onChange={onFileChange} />
+          <input ref={fileRef} type="file" accept=".json" multiple hidden onChange={onFileChange} />
           {data && <>
             <button className="btn-action" onClick={() => exportJSON(data)}>⬆ JSONエクスポート</button>
             <button className="btn-action" onClick={() => exportCSV(data)}>📊 CSV出力</button>
