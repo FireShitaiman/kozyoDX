@@ -236,6 +236,31 @@ body {
   white-space: nowrap;
 }
 
+/* ── Filter strip ──────────────────────────────────── */
+.filter-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.filter-strip-label { color: #1e40af; font-weight: 600; }
+.btn-clear-filter {
+  padding: 5px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e40af;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-clear-filter:hover { background: #dbeafe; }
+
 /* ── Alert bar ─────────────────────────────────────── */
 .alert-bar {
   display: flex;

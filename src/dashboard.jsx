@@ -326,6 +326,17 @@ export default function Dashboard() {
 
           <AlertBar eqList={eqList} />
 
+          {filter !== 'all' && (
+            <div className="filter-strip">
+              <span className="filter-strip-label">
+                「{STATUS_LABEL[filter]}」でフィルタ中 — {visible.length}台表示
+              </span>
+              <button className="btn-clear-filter" onClick={() => setFilter('all')}>
+                ✕ 全て表示
+              </button>
+            </div>
+          )}
+
           <div className="table-wrap">
             <table className="eq-table">
               <thead>
